@@ -3,9 +3,10 @@ package com.example.expense_tracker.controller;
 import com.example.expense_tracker.dto.SummaryResponse;
 import com.example.expense_tracker.entity.Expense;
 import com.example.expense_tracker.service.ExpenseService;
-import git --versionorg.springframework.data.domain.Page;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -70,6 +71,7 @@ public class ExpenseController {
         return expenseService.updateExpense(id, expense);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteExpense(@PathVariable Long id) {
         expenseService.deleteExpense(id);

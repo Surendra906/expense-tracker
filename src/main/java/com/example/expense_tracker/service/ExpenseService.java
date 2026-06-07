@@ -1,7 +1,13 @@
 package com.example.expense_tracker.service;
 
+import com.example.expense_tracker.dto.CategoryExpenseAnalytics;
+import com.example.expense_tracker.dto.MonthlyExpenseAnalytics;
+import com.example.expense_tracker.dto.MonthlyExpenseSummary;
+import com.example.expense_tracker.dto.SummaryResponse;
+import com.example.expense_tracker.dto.TotalExpenseAnalytics;
 import com.example.expense_tracker.entity.Expense;
 import com.example.expense_tracker.exception.ExpenseNotFoundException;
+import com.example.expense_tracker.repository.ExpenseJdbcRepository;
 import com.example.expense_tracker.repository.ExpenseRepository;
 import org.springframework.stereotype.Service;
 
@@ -15,15 +21,15 @@ import java.math.RoundingMode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.example.expense_tracker.dto.SummaryResponse;
-
 @Service
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
+    private final ExpenseJdbcRepository expenseJdbcRepository;
 
-    public ExpenseService(ExpenseRepository expenseRepository) {
+    public ExpenseService(ExpenseRepository expenseRepository, ExpenseJdbcRepository expenseJdbcRepository) {
         this.expenseRepository = expenseRepository;
+        this.expenseJdbcRepository = expenseJdbcRepository;
     }
 
     public Expense createExpense(Expense expense) {
@@ -61,17 +67,23 @@ public class ExpenseService {
         return expenseRepository.findByFilters(category, startDate, endDate, title, pageable);
     }
 
-        public SummaryResponse getSummary() {
-        List<Expense> all = expenseRepository.findAll();
-        BigDecimal total = all.stream()
-            .map(Expense::getAmount)
-            .filter(a -> a != null)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public TotalExpenseAnalytics getTotalExpenseAnalytics() {
+        return new TotalExpenseAnalytics(expenseJdbcRepository.findTotalExpenses(), expenseJdbcRepository.findExpenseCount());
+    }
 
-        Map<String, BigDecimal> byCategory = all.stream()
-            .filter(e -> e.getCategory() != null && e.getAmount() != null)
-            .collect(Collectors.groupingBy(Expense::getCategory,
-                Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)));
+    public List<CategoryExpenseAnalytics> getCategoryExpenseAnalytics() {
+        return expenseJdbcRepository.findCategoryAnalytics();
+    }
+
+    public List<MonthlyExpenseAnalytics> getMonthlyExpenseAnalytics() {
+        return expenseJdbcRepository.findMonthlyAnalytics();
+    }
+
+    public SummaryResponse getSummary() {
+        List<Expense> all = expenseRepository.findAll();
+        BigDecimal total = expenseJdbcRepository.findTotalExpenses();
+        Map<String, BigDecimal> byCategory = expenseJdbcRepository.findCategoryTotals();
+        List<MonthlyExpenseSummary> monthlySummaries = expenseJdbcRepository.findMonthlyExpenseSummary();
 
         long count = all.stream().filter(e -> e.getAmount() != null).count();
         BigDecimal average = (count > 0) ? total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
@@ -86,6 +98,6 @@ public class ExpenseService {
             .min(Comparator.comparing(Expense::getAmount))
             .orElse(null);
 
-        return new SummaryResponse(total, byCategory, average, highest, lowest);
+        return new SummaryResponse(total, byCategory, monthlySummaries, average, highest, lowest);
         }
 }
